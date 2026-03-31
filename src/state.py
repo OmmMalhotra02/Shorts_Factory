@@ -11,5 +11,5 @@ class ShortsState(TypedDict):
     video_path: str
     is_reviewed: bool
     review: str
-    review_type: Literal['script', 'media', 'both']
+    review_type: Literal['script', 'media', 'both', 'none']
     is_published: bool
