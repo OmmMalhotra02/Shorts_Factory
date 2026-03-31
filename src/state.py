@@ -1,6 +1,7 @@
 from typing import TypedDict, Literal
 
 class ShortsState(TypedDict):
+    genre: str
     topic: str
     script: str
     previous_script: str
