@@ -14,3 +14,4 @@ class ShortsState(TypedDict):
     review: str
     review_type: Literal['script', 'media', 'both', 'none']
     is_published: bool
+    assets_folder: str

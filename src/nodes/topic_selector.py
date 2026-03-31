@@ -1,13 +1,18 @@
 from ..state import ShortsState
 import sqlite3
 from typing import List
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
 from pathlib import Path
+import os
 load_dotenv()
 
 DB_PATH = Path(__file__).parent.parent.parent / "db" / "topics.db"
-llm = ChatGoogleGenerativeAI(model='gemini-2.5-flash-lite')
+llm = ChatOpenAI(
+    model="qwen/qwen3-next-80b-a3b-instruct:free",
+    base_url="https://openrouter.ai/api/v1",
+    api_key=os.getenv("OPENROUTER_API_KEY")
+)
 
 def generate_topics(genre: str, existing_topics: List[str]) -> List[str]:
     """
