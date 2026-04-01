@@ -9,6 +9,7 @@ class ShortsState(TypedDict):
     related_videos: list[str]
     caption: str
     audio_path: str
+    subtitle_path: str
     video_path: str
     is_reviewed: bool
     review: str
