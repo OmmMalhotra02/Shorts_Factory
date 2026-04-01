@@ -1,6 +1,7 @@
 from ..state import ShortsState
 import sqlite3
 from typing import List
+from pydantic import BaseModel
 from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
 from pathlib import Path
@@ -13,6 +14,9 @@ llm = ChatOpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=os.getenv("OPENROUTER_API_KEY")
 )
+
+class TopicResponse(BaseModel):
+    topics: List[str]
 
 def generate_topics(genre: str, existing_topics: List[str]) -> List[str]:
     """
@@ -37,22 +41,16 @@ def generate_topics(genre: str, existing_topics: List[str]) -> List[str]:
         {existing_topics[:100]}
 
         OUTPUT FORMAT:
-        Return a clean numbered list only. No headers, no explanations, no extra text.
-        1. Topic here
-        2. Topic here
+        Generate a list of topics.
+        Return the result as valid JSON in this format:
+        {
+            "topics": ["topic 1", "topic 2", "topic 3"]
+        }
         """
-    resp = llm.invoke(prompt).content
-    lines = resp.strip().split('\n')
-    topics = []
-    for line in lines:
-        line = line.strip()
-        if line:
-            # remove numbering like "1. " or "1) "
-            if line[0].isdigit():
-                line = line.split('.', 1)[-1].strip()
-                line = line.split(')', 1)[-1].strip()
-            topics.append(line)
-    return topics
+    llm_struct_op = llm.with_structured_output(TopicResponse)
+    resp = llm_struct_op.invoke(prompt)
+    
+    return resp.topics
 
 def ensure_topice_pool(genre: str, cursor):
 
