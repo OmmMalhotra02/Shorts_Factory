@@ -1,4 +1,4 @@
-from ..state import ShortsState
+from state import ShortsState
 from pydantic import BaseModel
 from typing import List
 import os
@@ -7,6 +7,7 @@ import requests
 import time
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
+from dotenv import load_dotenv
 
 class Scene(BaseModel):
     scene: str
@@ -15,10 +16,12 @@ class Scene(BaseModel):
 class SceneOutput(BaseModel):
     scenes: List[Scene]
 
+load_dotenv()
+
 llm = ChatOpenAI(
-    model="qwen/qwen3-next-80b-a3b-instruct:free",
+    model="nvidia/nemotron-3-super-120b-a12b:free",
     base_url="https://openrouter.ai/api/v1",
-    api_key=os.getenv("OPENROUTER_API_KEY")
+    api_key=os.getenv("OPENROUTER_KEY")
 )
 scene_llm = llm.with_structured_output(SceneOutput)
 
@@ -57,6 +60,12 @@ def extract_scenes(script: str):
             Example:
             "cinematic astronaut floating in space 4k earth glowing slow motion"
 
+            BAD query: "person walking on earth"
+            GOOD query: "earth core rotation cross section geology 4k"
+            GOOD query: "molten iron earth inner core spinning cinematic"
+
+            Always describe the SCIENCE being shown, not generic human activity.
+
             Return JSON in this format:
             {{
             "scenes": [
@@ -76,9 +85,11 @@ def fetch_pexels_video(query: str):
     headers = {"Authorization": os.getenv('PEXELS_KEY')}
 
     params = {
-        "query": query,
-        "per_page": 3
-    }
+    "query": query,
+    "per_page": 5,
+    "orientation": "portrait",  # 9:16 friendly
+    "size": "large"
+}
 
     try:
         res = requests.get(url, headers=headers, params=params)
@@ -100,9 +111,11 @@ def fetch_pexels_image(query: str):
     headers = {"Authorization": os.getenv('PEXELS_KEY')}
 
     params = {
-        "query": query,
-        "per_page": 3
-    }
+    "query": query,
+    "per_page": 5,
+    "orientation": "portrait",  # 9:16 friendly
+    "size": "large"
+}
 
     try:
         res = requests.get(url, headers=headers, params=params)
@@ -119,8 +132,10 @@ def fetch_nasa_image(query: str):
     url = "https://images-api.nasa.gov/search"
 
     params = {
-        "q": query,
-        "media_type": "image"
+    "query": query,
+    "per_page": 5,
+    "orientation": "portrait",  # 9:16 friendly
+    "size": "large"
     }
 
     try:

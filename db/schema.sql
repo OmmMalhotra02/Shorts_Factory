@@ -1,10 +1,9 @@
-CREATE TABLE IF NOT EXISTS topics (
+CREATE TABLE topics (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-
     genre TEXT NOT NULL,
     topic TEXT NOT NULL UNIQUE,
-
     is_used INTEGER DEFAULT 0,
+    virality_score INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     published_at DATETIME
-)
+);

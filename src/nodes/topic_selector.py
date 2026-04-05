@@ -1,90 +1,122 @@
-from ..state import ShortsState
+from state import ShortsState
 import sqlite3
-from typing import List
+from typing import List, Tuple
 from pydantic import BaseModel
 from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
 from pathlib import Path
 import os
+
 load_dotenv()
 
 DB_PATH = Path(__file__).parent.parent.parent / "db" / "topics.db"
+
 llm = ChatOpenAI(
-    model="qwen/qwen3-next-80b-a3b-instruct:free",
+    model="nvidia/nemotron-3-super-120b-a12b:free",
     base_url="https://openrouter.ai/api/v1",
-    api_key=os.getenv("OPENROUTER_API_KEY")
+    api_key=os.getenv("OPENROUTER_KEY")
 )
+
+# ---------- MODELS ----------
 
 class TopicResponse(BaseModel):
     topics: List[str]
 
-def generate_topics(genre: str, existing_topics: List[str]) -> List[str]:
-    """
-    Call LLM to generate high-quality, viral-ready topics
-    """
+class ScoredTopic(BaseModel):
+    topic: str
+    virality_score: int
 
-    prompt = f"""
-        You are a viral YouTube Shorts content strategist specializing in {genre}.
+class ScoredTopicsResponse(BaseModel):
+    topics: List[ScoredTopic]
 
-        Generate exactly 20 topic ideas that will perform well as 30-45 second short videos.
+# ---------- GENERATE + SCORE ----------
 
-        CRITERIA FOR EACH TOPIC:
-        - Leads with a surprising, counterintuitive, or little-known fact
-        - Has strong visual potential (landscapes, space imagery, human expressions)
-        - Creates an immediate "I never knew that" reaction
-        - Specific, not generic — name places, dates, numbers where possible
-
-        BAD EXAMPLE: "Interesting facts about oceans"
-        GOOD EXAMPLE: "The Pacific Ocean is wider than the Moon is from Earth"
-
-        AVOID repeating these existing topics:
-        {existing_topics[:100]}
-
-        OUTPUT FORMAT:
-        Generate a list of topics.
-        Return the result as valid JSON in this format:
-        {
-            "topics": ["topic 1", "topic 2", "topic 3"]
-        }
-        """
-    llm_struct_op = llm.with_structured_output(TopicResponse)
-    resp = llm_struct_op.invoke(prompt)
+def generate_topics(genre: str, existing_topics: List[str]) -> List[Tuple[str, int]]:
     
-    return resp.topics
+    # -------- STEP 1: Generate Topics --------
+    prompt = f"""
+        You are a viral YouTube Shorts strategist school students.
 
-def ensure_topice_pool(genre: str, cursor):
+        Generate exactly 20 HIGHLY engaging topics for: {genre}
 
-    cursor.execute(
+        Each topic MUST:
+        - Be directly from NCERT/CBSE curriculum for that class
+        - Create curiosity
+        - Start with a surprising or counterintuitive fact
+        - Be explainable in 30 to 60 seconds
+        - Be visually explainable
+        - Feel like "I never knew this was in my textbook"
+
+        Avoid these:
+        {existing_topics[:30]}
         """
-        SELECT COUNT(*) FROM topics WHERE genre=? 
-        AND is_used=0
-        """,(genre,)
-    )
+
+    llm_topics = llm.with_structured_output(TopicResponse)
+    resp = llm_topics.invoke(prompt)
+    topics = resp.topics
+
+    # -------- STEP 2: Score Topics --------
+    score_prompt = f"""
+        Rate each topic from 1 to 10 for viral potential.
+
+        Criteria:
+        - Hook strength
+        - Curiosity gap
+        - Shareability
+        - Visual potential
+
+        Topics:
+        {topics}
+
+        Return JSON:
+        topics: [{{"topic": "...", "virality_score": 8}}]
+        """
+
+    llm_scores = llm.with_structured_output(ScoredTopicsResponse)
+    scored_resp = llm_scores.invoke(score_prompt)
+
+    scored_topics = [
+        (t.topic.strip().capitalize(), t.virality_score)
+        for t in scored_resp.topics
+        if t.virality_score >= 7
+    ]
+
+    # fallback if all filtered out
+    if not scored_topics:
+        scored_topics = [(t.strip().capitalize(), 5) for t in topics]
+
+    return scored_topics
+
+# ---------- DB MANAGEMENT ----------
+
+def ensure_topic_pool(genre: str, cursor):
+
+    cursor.execute("""
+        SELECT COUNT(*) FROM topics 
+        WHERE genre=? AND is_used=0
+    """, (genre,))
     unused_count = cursor.fetchone()[0]
 
-    cursor.execute(
-        """
-        SELECT COUNT(*) FROM topics WHERE genre=?
-        """,(genre,)
-    )
+    cursor.execute("""
+        SELECT COUNT(*) FROM topics 
+        WHERE genre=?
+    """, (genre,))
     total_count = cursor.fetchone()[0]
 
-    if total_count==0 or unused_count <=3:
-        cursor.execute(
-            """
+    if total_count == 0 or unused_count <= 3:
+        cursor.execute("""
             SELECT topic FROM topics WHERE genre=?
-            """,(genre,)
-        )
+        """, (genre,))
         existing = [row[0] for row in cursor.fetchall()]
 
         new_topics = generate_topics(genre, existing)
-        cursor.executemany(
-            """
-            INSERT OR IGNORE INTO topics (genre, topic)
-            VALUES (?, ?)
-            """,
-            [(genre, t) for t in new_topics]
-        )
+
+        cursor.executemany("""
+            INSERT OR IGNORE INTO topics (genre, topic, virality_score)
+            VALUES (?, ?, ?)
+        """, [(genre, topic, score) for topic, score in new_topics])
+
+# ---------- MAIN NODE ----------
 
 def topic_selector(state: ShortsState) -> dict:
     genre = state['genre']
@@ -92,28 +124,42 @@ def topic_selector(state: ShortsState) -> dict:
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    ensure_topice_pool(genre, cursor)
-
-    cursor.execute(
-        """
-        SELECT id, topic FROM topics 
-        WHERE genre=? AND is_used=0 
-        ORDER BY created_at ASC LIMIT 1
-        """,(genre,)
+    # updated schema
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS topics (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        genre TEXT NOT NULL,
+        topic TEXT NOT NULL,
+        is_used INTEGER DEFAULT 0,
+        virality_score INTEGER DEFAULT 0,
+        published_at DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
+    """)
+
+    ensure_topic_pool(genre, cursor)
+
+    # pick BEST topic, not oldest
+    cursor.execute("""
+        SELECT id, topic FROM topics
+        WHERE genre=? AND is_used=0
+        ORDER BY virality_score DESC, created_at DESC
+        LIMIT 1
+    """, (genre,))
+    
     row = cursor.fetchone()
+
     if row is None:
         conn.close()
         raise Exception(f"No topics available for genre: {genre}")
-    
+
     topic_id, topic = row
 
-    cursor.execute(
-        """
+    cursor.execute("""
         UPDATE topics SET is_used=1 WHERE id=?
-        """,(topic_id,)
-    )
+    """, (topic_id,))
 
     conn.commit()
     conn.close()
+
     return {"topic": topic}

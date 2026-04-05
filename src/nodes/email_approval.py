@@ -7,16 +7,26 @@ from datetime import datetime, timezone
 from typing import Dict
 from state import ShortsState
 import os
+from dotenv import load_dotenv
+load_dotenv()
+import json
 
 SENDER_EMAIL = os.getenv('SENDER_EMAIL')
 APP_PASSWORD = os.getenv('GMAIL_PASSWORD')
 
-
 # -------------------------
 # Send Email
 # -------------------------
+
 def send_email(state: ShortsState):
-    yag = yagmail.SMTP(SENDER_EMAIL, APP_PASSWORD)
+    yag = yagmail.SMTP(
+        user=SENDER_EMAIL,
+        password=APP_PASSWORD,
+        host="smtp.gmail.com",
+        port=587,
+        smtp_starttls=True,
+        smtp_ssl=False
+    )
 
     request_id = str(uuid.uuid4())[:8]
     timestamp = datetime.now(timezone.utc)
@@ -24,26 +34,57 @@ def send_email(state: ShortsState):
     subject = f"[SHORTS APPROVAL][{request_id}] {state['topic']}"
 
     body = f"""
-Request ID: {request_id}
+        Request ID: {request_id}
 
-Topic: {state['topic']}
+        Topic: {state['topic']}
 
-Script:
-{state['script']}
+        Script:
+        {state['script']}
 
-Caption:
-{state['caption']}
+        Caption:
+        {state['caption']}
 
-Reply with ONE of the following:
+        Reply with ONE of the following:
 
-approve
+        approve
 
-script change: <your feedback>
+        script change: <your feedback>
 
-media change: <your feedback>
+        media change: <your feedback>
 
-both: <your feedback>
-"""
+        both: <your feedback>
+    """
+
+    os.makedirs("approvals", exist_ok=True)
+    # 🔥 SAVE REQUEST
+    data = {
+        "request_id": request_id,
+        "sent_time": timestamp.isoformat(),
+        "state": state,
+        "status": "pending"
+    }
+
+    def serialize(obj):
+        if hasattr(obj, "model_dump"):
+            return obj.model_dump()
+        elif hasattr(obj, "__dict__"):
+            return obj.__dict__
+        return str(obj)
+
+    os.makedirs("approvals", exist_ok=True)
+
+    data = {
+        "request_id": request_id,
+        "sent_time": timestamp.isoformat(),
+        "state": state,
+        "status": "pending"
+    }
+
+    with open(f"approvals/{request_id}.json", "w") as f:
+        json.dump(data, f, default=serialize, indent=2)
+
+    if not os.path.exists(state["video_path"]):
+        raise FileNotFoundError(f"🚨 Video not found: {state['video_path']}")
 
     yag.send(
         to=SENDER_EMAIL,
@@ -105,6 +146,11 @@ def check_reply(request_id: str, sent_time: datetime, timeout=3600, interval=15)
             email_date = msg["date"]
             email_dt = email.utils.parsedate_to_datetime(email_date)
 
+            email_dt = email.utils.parsedate_to_datetime(email_date)
+
+            if email_dt.tzinfo is None:
+                email_dt = email_dt.replace(tzinfo=timezone.utc)
+
             if email_dt < sent_time:
                 continue
 
@@ -150,22 +196,29 @@ def parse_review(reply: str):
 # -------------------------
 # Main Node
 # -------------------------
-def email_approval(state: ShortsState) -> Dict:
+def email_approval(state: ShortsState) -> dict:
     request_id, sent_time = send_email(state)
+    
+    # save pending approval file
+    approval_file = f"approvals/{request_id}.json"
+    
+    # just watch the file — approval_worker handles IMAP
+    while True:
+        with open(approval_file) as f:
+            data = json.load(f)
+        if data["status"] == "done":
+            return {
+                "is_reviewed": True,
+                "review": data["review"],
+                "review_type": data["review_type"]
+            }
+        
+        if data["status"] == "timeout":      # ← add this block
+            print("⏰ Approval timed out")
+            return {
+                "is_reviewed": False,
+                "review": "",
+                "review_type": "none"
+            }
 
-    reply = check_reply(request_id, sent_time)
-
-    review_type, review = parse_review(reply)
-
-    if reply is None:
-        return {
-            "is_reviewed": False,
-            "review": "",
-            "review_type": "none"
-        }
-
-    return {
-        "is_reviewed": True,
-        "review": review,
-        "review_type": review_type
-    }
+        time.sleep(10)

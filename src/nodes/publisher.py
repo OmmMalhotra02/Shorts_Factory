@@ -1,4 +1,4 @@
-from ..state import ShortsState
+from state import ShortsState
 
 def publisher(state: ShortsState) -> dict:
-    return {state['is_published']}
+    return {"is_published": True}

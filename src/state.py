@@ -5,8 +5,6 @@ class ShortsState(TypedDict):
     topic: str
     script: str
     previous_script: str
-    related_images: list[str]
-    related_videos: list[str]
     caption: str
     audio_path: str
     subtitle_path: str
@@ -16,3 +14,8 @@ class ShortsState(TypedDict):
     review_type: Literal['script', 'media', 'both', 'none']
     is_published: bool
     assets_folder: str
+    visual_plan: dict
+    scenes: list[dict]
+    rendered_clips: list[str]
+    generated_images: dict[int, list[str]]
+    timed_sentences: list[dict]
