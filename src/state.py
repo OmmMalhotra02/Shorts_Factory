@@ -14,8 +14,5 @@ class ShortsState(TypedDict):
     review_type: Literal['script', 'media', 'both', 'none']
     is_published: bool
     assets_folder: str
-    visual_plan: dict
-    scenes: list[dict]
     rendered_clips: list[str]
-    generated_images: dict[int, list[str]]
-    timed_sentences: list[dict]
+    scene_plan: list[dict]

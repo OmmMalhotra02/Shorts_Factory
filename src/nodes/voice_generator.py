@@ -47,10 +47,10 @@ def voice_generator(state: ShortsState) -> dict:
     topic = state['topic']
     script = state['script']
 
-    # sanitize filename
+    #  sanitize filename
     safe_topic = re.sub(r'[^a-zA-Z0-9_]', '', topic.replace(" ", "_")).lower()
 
-    assets_folder = Path("public/assets") / f"{state['genre']}_{int(time.time())}"
+    assets_folder = Path("outputs/runs") / f"{state['genre']}_{int(time.time())}"
     assets_folder.mkdir(parents=True, exist_ok=True)
 
     audio_path = assets_folder / f"{safe_topic}.mp3"

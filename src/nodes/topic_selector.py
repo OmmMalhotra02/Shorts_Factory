@@ -35,17 +35,24 @@ def generate_topics(genre: str, existing_topics: List[str]) -> List[Tuple[str, i
     
     # -------- STEP 1: Generate Topics --------
     prompt = f"""
-        You are a viral YouTube Shorts strategist school students.
+        You are a viral YouTube Shorts strategist for Indian school students.
 
-        Generate exactly 20 HIGHLY engaging topics for: {genre}
+        Generate 20 topics for: {genre}
 
-        Each topic MUST:
-        - Be directly from NCERT/CBSE curriculum for that class
-        - Create curiosity
-        - Start with a surprising or counterintuitive fact
-        - Be explainable in 30 to 60 seconds
-        - Be visually explainable
-        - Feel like "I never knew this was in my textbook"
+        Each topic must:
+        - Be from NCERT/CBSE
+        - Start with a curiosity hook
+        - Be counterintuitive or surprising
+        - Be explainable in under 60 seconds
+        - Be highly visual
+
+        STYLE:
+        - Make student think: "Wait, what?!"
+        - Avoid boring textbook phrasing
+
+        FORMAT:
+        - One line per topic
+        - No numbering
 
         Avoid these:
         {existing_topics[:30]}

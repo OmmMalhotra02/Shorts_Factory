@@ -24,29 +24,36 @@ def script_generator(state: ShortsState) -> dict:
     review = state.get('review', '')
 
     prompt = f"""
-            You are an educational YouTube Shorts scriptwriter for Indian school students (Class 6-12).
-
-            Write a clear, engaging script that explains a concept in 45-60 seconds.
+            You are a YouTube Shorts scriptwriter for Indian students (Class 6-12).
 
             TOPIC: {topic}
             GENRE: {genre}
 
+            Write a 45-60 second script (100-140 words).
+
+            STYLE:
+            - Speak directly to "you"
+            - Clear, simple, engaging
+            - Like a great teacher explaining visually
+
+            STRUCTURE:
+            1. Hook (curiosity in first line)
+            2. Simple explanation
+            3. Build insight
+            4. Surprising conclusion
+
             RULES:
-            - Word count: 100-130 words
-            - Tone: warm, curious teacher talking to a student
-            - Flow: natural continuous sentences, no fragments
-            - Structure: Hook → Explain simply → Build to surprising truth → Mind-blowing conclusion
-            - First line must hook immediately — reuse or rephrase the topic
-            - No "Did you know", no broken dramatic pauses
-            - Speak directly to viewer using "you"
-            - Never repeat phrasing from: {previous_script}
+            - No "Did you know"
+            - No filler or repetition
+            - No dramatic pauses
+            - Must be easy to visualize
 
-            GENRE STYLE:
-            - science: explain the mechanism behind the phenomenon
-            - geography: connect place/event to something student can visualize
-            - fun_facts: reveal the surprising truth hiding behind everyday things
-            """
+            IMPORTANT:
+            Every sentence should be something that can be animated visually.
 
+            Avoid repeating:
+            {previous_script}
+        """
     if review:
         prompt += f"""
 
